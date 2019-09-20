@@ -32,6 +32,6 @@ def save_Msg(Msgs):
 
 for i in range(1,13):
     save_Msg(getMsg(i))
-    print(f"第{i}页数据保存完成")
+    print(f"第{i}页数据已保存完成")
 
 
