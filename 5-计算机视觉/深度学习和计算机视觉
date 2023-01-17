@@ -1,0 +1,193 @@
+
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+词向量
+1、将文本预处理 转换为整数（tokenize）
+2、构造训练的样本。重点：移动的滑窗取词。
+3、构建占位符 （targets shape=[None, 1]）
+   targets是真实的值。
+4、构建嵌入层；
+5、构建输出层+ 模型损失（负采样损失）
+6、构建模型优化器。
+
+
+原始数据序列encoded： 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+
+1、len(encoder) // (batch_size * n_steps)  = n_batches
+2、对原始数据从末尾进行截断[: batch_size *n_steps* n_batches]。
+       1 2 3 4 5 6 7 8 9 10 11 12
+3、重塑np.reshape( [batch_size, -1])    [[1 2 3   4   5   6],
+                                         [7 8 9   10 11  12]]
+4、构造输入和 目标
+  batch_y0 : [2 3  4]
+             [8 9 10]
+
+  batch_x0 : [1 2 3]   
+             [7 8 9]   
+
+  batch_y1 : [5  6  0]
+             [11 12 0]
+
+  batch_x1 : [4  5  6]   
+             [10 11 12]    	
+
+  batch_y2 : [5  6  1  2]   动态rnn可以允许不同批次之间 n_steps不一致。
+             [11 12 2  3]
+
+  batch_x2 : [4  5  6  6]   
+             [10 11 12  8] 			 
+
+
+
+
+中文情感分析流程：
+    1、读入数据，将 标点符号 全部去除掉；
+    2、分词
+    3、tokenize (用的gensim中的已有的tokenize)。 未登录词，用0代替。
+    4、填充和 裁剪，使得所有的文本长度一致。
+	
+	5、用keras构建模型图；
+	6、定义callbacks对象（ 持久化， 学习率衰减， 早期停止技术）
+	7、使用测试数据评估模型。
+	
+	
+	
+tensorflow GPU版本的安装。
+	1、确定你要安装的tf-gpu的版本和cuda的版本。
+		 tf-gpu 1.13以上的版本（包含）， 需要和cuda10.0(不能是10.1)配套。
+		 tf-gpu 1.4.0--1.12的版本，需要和 cuda9配套。
+	2、N卡(显卡的)：显卡的最新驱动。
+	3、安装配套版本的cuda。https://developer.nvidia.com/cuda-toolkit-archive
+	4、下载配套cuda的 cudnn版本，下载--解压--覆盖即可。
+	5、win系统 需要安装vs2015。
+	6、最后 安装tensorflow-gpu的版本。
+
+
+
+移动端或者IoT设备模型部署：
+    1、设计轻量级模型。 (Mobile_Net-V3， Shuffle-Net,  Xception)
+	2、用师傅训练一个 学生网络
+	3、模型裁剪。（将趋近于0的权重 丢弃）
+	
+
+骨干网络趋势：
+    1、深。 ResNet  DenseNet
+	2、宽。 Inception  Inception-ResNet（宽+深 结合）  ResNext（宽+深 结合）
+	3、卷积的注意力机制。 SeNet   CBAM    Non-Local-Net  Global Context net
+
+
+重点网络：
+    1、服务器端： ResNet-50  ResNext(原理，代码) ---> InceptionNet ---> VGG16 ---> SeNet --->CBAM
+	2、移动端：  Mobile_Net-V3(原理，代码) ---> ShuffleNet
+	3、会计算模型的参数量和计算量。
+	
+
+GRE正向(MBGD)  N = batch_size
+	np.dot(input(N, 6), W1(6, 4)) = hidden_input     (N, 4)
+	hidden_output = sigmoid(hidden_input)      (N, 4)
+
+	final_input = np.dot(hidden_output(N, 4), W2(4, 1))     [N, 1]
+	y_hat = sigmoid(final_input)  [N, 1]
+	error = y_hat - y   [N, 1]
+	
+	
+	
+SGD：随机梯度下降：每次随机选择一个样本，计算梯度值，并且更新模型权重。
+BGD: 计算所有样本的梯度平均值。然后再更新模型权重。
+MBGD：小批量梯度下降。每次随机选择batch_size样本（随机打乱样本顺序），
+      计算梯度的平均值，再更新模型权重。
+
+问题：上述3种梯度下降方法的优劣。
+
+
+批归一化面试总结。
+1、BN算法实现流程。 归一化 ---> 位移和缩放（有2个学习的参数 gamma和beta）
+2、BN中代码实现的核心。 更新pop_mean 和 pop_variance （如何控制更新，通过assign操作符和控制依赖项实现）
+3、BN何时会失效？ 如果batch_size比较小的情况下，效果会直线下降。 ----> 分组归一化、LayerNorm 权重归一化等。
+
+
+
+计算机视觉总结;
+	0\传统视觉算法。
+		重点：sobel算子（图片梯度值），HOG算法，SS选择性搜索（补充：霍夫变换--检测直线或者圆形）
+		
+	1\目标检测3个体系：a、2阶段；b、1阶段；c、anchor free(补充)
+		区别：2阶段和1阶段的区别：看图说话；
+			问题：为什么2阶段的比1阶段的MAP效果要好？解释：Cascade(级联)RCNN的解释。
+		基于锚点框的体系和anchor free体系异同：
+			a、锚点体系：fasterRCNN yoloV3 SSD。
+			b、anchor free:CenterNet和CornerNet。
+			
+	2\基础概念。
+		a、IOU交并比。A∩B / A∪B ----> GIOU
+		b、MAP计算
+		c、NMS(非极大值抑制) ---> soft NMS
+		
+	3\二阶段算法：
+		a\Faster-RCNN(锚点框，RPN网络，ROIpooling), MASK-RCNN
+			问题：ROIpooling的问题 ----> ROI align(对齐)
+			
+	4\一阶段算法：
+		a、YOLO-V3（能够实时性预测的网络，每秒30fps）
+			损失函数（1回归， 2置信度损失(前景背景损失) 3类别概率损失）。3类别概率从softmax损失-->sigmoid损失。
+			image金字塔（多尺度的训练）--->提升模型的MAP。
+			FPN特征金字塔。
+		b、SSD(缺点：对小物体检测效果差 --> DSSD)
+			多尺度的特征做预测（不同尺度的feat map它的感受野不一样，尺寸大的feat map感受野小，预测小物体，尺寸小的feat map感受野大，预测大物体好）
+			膨胀卷积（带孔卷积），为了扩大感受野的。
+			回归损失函数：smoothL1loss，为什么不用MSE（L2损失）
+			
+	5\anchor free算法
+		a、cornerNet
+			角点池化：
+			如何判断各自的角点是同一物体的。（组内距离越小，组间距离越大）
+		b\CenterNet
+			focalLoss（RetinaNet中提出来的）。是对交叉熵损失函数的优化。优化目的：是解决正负样本不平衡的问题。
+			
+	6\人脸识别项目
+		a、人证对比
+			人脸识别(YOLO-V3, MTCNN) ---> 人脸特征提取（FaceNet）
+			人脸特征的提取：损失函数的要求（tripletLoss）：使得同一个体内距离小于不同个体间距离(聚类)
+			达成上述要求：1、softmax分类+centerLoss; 2、tripletLoss损失； ---> Margin Loss
+		
+		
+CV第一周重点
+1、传统视觉：sobel算子，HOG算法（补充：霍夫变换）
+2、二阶段：RCNN， Faster-RCNN(ROI池化，RPN网络)
+3、一阶段：SSD 和 YOLO-V3（补充：CenterNet CornerNet）  ----> 其次掌握SSD代码。
+4、GIOU，Focal_Loss、特征金字塔结构。
+
+
+实例分割课程重点：
+	1、网络结构：Unet  DeepLab_V3  MaskRCNN(也可以做目标检测)
+	2、上采样的方式：resize, deconv. CARAFE(建议这个)
+	3、MaskRCNN重点：ROI pooling ---> ROI align(对齐)
+		Faster-RCNN中ROI池化的问题：
+			1、从RPN网络中获取的ROI在原图中的坐标 ---->映射到特征图是有位置偏移的(主要是取整数导致的)
+			2、做ROI池化时候，不能均与等分导致。
+			优化方法：ROI_align(对齐)
+			
+	
+"""
+项目中YOLOv3优化建议：（即人脸通道闸机项目的优化建议，不是要求都要实现，但是你必须能说出来缘由））
+    你碰到哪些坑？你是如何爬出这些坑的？方法如下：
+    1、根据你的业务知识进行锚框调整（先对gt做聚类，3个锚框）
+    2、考虑实时性：将darknet53改成mobileNet-V3（考虑下）
+    3、调整为Hswish.  softplus
+    4、新的归一化的方式：GroupNorm ----> google FRN层
+    5、将IOU损失 优化为  GIOU Loss     直接map提升了1.5%。（why? IOU损失的缺点，GIOU可以弥补）
+    6、上采样方式优化：（之前用的resize(最近邻法) ---> 尝试了 deconv 和 二次线性插值， 效果一样） ---> Carafe(卷积的，有参数)
+        更改后的效果：MAP提升了1.1%
+        为什么carafe有效？
+            a、carafe感受野相对比较大。因为二次线性插值感受野小，只由周边4个像素点的值计算而来；
+            b、carafe基于内容感知重组。而deconv(转置卷积)所获得的输出的一层是使用一个固定的卷积核对所有的像素区域来做。
+            c、轻量级且计算量适中。
+"""
+
+
+项目中：SSD模型优化建议方向：(物体检测和行人检测)
+    -a、骨干网络调整为：MobileNetV3（将BN改为 分组归一化GroupNorm）
+    -b、将ssd预测的多尺度预测的结构，优化为：特征金字塔结构。
+    -c、将单尺度训练--->图片金字塔。
+    -d、损失优化：将CrossEntropyLoss调整为Focal_Loss，评价标准：IOU -->GIOU
+	
